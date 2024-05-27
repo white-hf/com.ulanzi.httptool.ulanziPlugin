@@ -1,0 +1,27 @@
+{
+  "Name": "Httptool",
+  "Icon": "resources/images/pluginIcon",
+  "Author": "Ulanzi",
+  "Description": "Httptool is a tool to perform http request and match the specified field in the response.",
+  "PrivateAPI": true,
+  "Version": "1.0.0",
+  "Category": "Ulanzi Deck",
+  "CategoryIcon": "resources/images/categoryIcon",
+  "CodePath": "httptool.html",
+  "Type": "JavaScript",
+  "UUID": "com.ulanzi.httptool",
+  "Actions": [
+    {
+      "Name": "Httptool",
+      "UUID": "com.ulanzi.httptool.tool",
+      "Icon": "resources/images/actionIcon",
+      "State": "0",
+      "States": [
+        {
+          "Image": "resources/images/actionDefaultImage"
+        }
+      ],
+      "Tooltip": "Httptool"
+    }
+  ]
+}
