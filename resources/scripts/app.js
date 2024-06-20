@@ -1,10 +1,8 @@
 //app.js 被manifest中的CodePath引用，作为常态的websocket client与上位软件通信，插件被安装时加载，被卸载时销毁
 
-const pluginUUID = 'com.ulanzi.counter'
+const ActionBase = require('./base/base.js')
 
-const httpToolAction = new HttpToolAction()
-httpToolAction.connectUlanziDeckSocket(3906, pluginUUID)
-
+const pluginUUID = 'com.ulanzi.httptool'
 class HttpToolAction extends ActionBase {
 
   constructor() {
@@ -16,19 +14,17 @@ class HttpToolAction extends ActionBase {
   */
   onAdd(uniqueActionId, uuid, remoteKey, param) {
     //插件第一次添加时没有配置数据，不需要运行。
-    let request_url = data[uniqueActionId]
+    let request_url = this.data[uniqueActionId]
     if (param.request_url)
     {
-      param['actionid'] = uniqueActionId
-      param['key'] = key
-   
       if (!request_url)
       {
-        request_url = new HttpApiRequest(param)
-        data[uniqueActionId] = request_url
+        request_url = new HttpApiRequest(param , uniqueActionId)
+        this.data[uniqueActionId] = request_url
       }else
         request_url.updateSettings(param)
 
+        
       request_url.performRequest()
     }
   }
@@ -37,42 +33,54 @@ class HttpToolAction extends ActionBase {
   * 删除插件配置信息
   */
   onClear(uniqueActionId, uuid, remoteKey, param) {
-    let request_url = data[uniqueActionId]
+    let request_url = this.data[uniqueActionId]
     if (request_url)
     {
       request_url.destroy()
-      delete data[uniqueActionId]
+      delete this.data[uniqueActionId]
     }
   }
 
+  /**
+   * 在硬件上按下运行按钮，不同插件实现不同逻辑
+   * @param {*} uniqueActionId 
+   * @param {*} uuid 
+   * @param {*} key 
+   * @param {*} param 
+   */
   onRun(uniqueActionId, uuid, key, param) {
-    //在硬件上按下运行按钮
+    
     console.log('onRun')
 
-    param['actionid'] = uniqueActionId
-    param['key'] = key
-
-    let request_url = data[uniqueActionId]
+    let request_url = this.data[uniqueActionId]
     if (!request_url)
     {
       this.onAdd(uniqueActionId , uuid , key , param)
     }
     else
+    {
+      request_url.updateSettings(param)
       request_url.performRequest()
+    }
   }
 
 
   onLoadConfiguration(param) {
     console.log('onLoadConfiguration in HttpToolAction')
-    let request_url = data[uniqueActionId]
+    let request_url = this.data[uniqueActionId]
     if (request_url)
       request_url.updateSettings(param)
   }
 }
 
-function HttpApiRequest(param) {
+/**
+ * 具体的http请求实现类
+ * @param {*} param 
+ */
+function HttpApiRequest(param , uniqueActionId) {
   var settings = param,
   poll_timer = 0,
+  actionId = uniqueActionId,
   key_state = null;
 
 function performRequest() {
@@ -98,17 +106,13 @@ function destroy() {
   }
 }
 
-function showAlertMsg(msg)
-{
- 
-}
 
 function showSuccess(resp , do_status_poll)
 {
   if (!settings.response_parse || !do_status_poll)
   {
     //显示请求成功提醒
-    showText('Api requested successfully')
+    httpToolAction.showText('Api requested successfully' , actionId)
   }
 }
 
@@ -119,7 +123,7 @@ function updateSettings(new_settings) {
 
 function sendRequest(do_status_poll = false) {
   if (!settings.request_url) {
-      showAlertMsg('Invalid url');
+    httpToolAction.showText('Invalid url' , actionId);
       return;
   }
 
@@ -151,8 +155,9 @@ function sendRequest(do_status_poll = false) {
       .then((resp) => checkResponseValue(resp, do_status_poll))
       .then((resp) => showSuccess(resp, do_status_poll))
       .catch(err => {
-        httpToolAction.showText('Api request failed');
-          console.log(err);
+        httpToolAction.showText('Api request failed' , actionId);
+        console.log('Failed to request ' + url);
+        console.log(err);
       }
   );
 
@@ -193,8 +198,15 @@ async function checkResponseStatus(resp) {
   }
   return resp;
 }
+
+/**
+ * 检查http请求返回的报文是否与配置的数据匹配，并在下行设备显示预先配置好的图标。
+ * @param {*} resp 
+ * @param {*} do_status_poll 
+ * @returns 
+ */
 async function checkResponseValue(resp, do_status_poll) {
-  if (!settings.response_parse || !settings.image_matched || !settings.image_unmatched)
+  if (!settings.response_parse)
       return;
 
   let json, body;
@@ -218,12 +230,13 @@ async function checkResponseValue(resp, do_status_poll) {
 
   key_state = new_key_state;
 
-  path = key_state
-              ? settings.image_matched
-              : settings.image_unmatched;
+  //需要2个资源文件，根据请求结果是否匹配显示
+  imageIndex = key_state
+              ? 1 
+              : 2;
   
   //httpToolAction.setImageByPath
-  httpToolAction.setImageByPath(path)
+  httpToolAction.setImage(imageIndex , actionId)
   return resp;
 }
 
@@ -259,8 +272,50 @@ function lookForPathValue(json, path) {
   return result;
 }
 
-
+return {
+  performRequest: performRequest,
+  updateSettings: updateSettings,
+  destroy: destroy
+};
 }
+
+
+/**
+ * 单元测试代码
+ */
+function test()
+{
+  const ht = new HttpToolAction()
+
+  let paramData = {
+    request_url:'http://127.0.0.1:3306/api',
+    response_parse:false,
+    poll_status:false,
+    request_method:'GET',
+    request_body:'',
+    request_headers:'origin:http://127.0.0.1:3306\nt1:v1',
+    request_content_type:'application/xml'
+  }
+
+  let json = {
+    code: '0',
+    cmd: 'add',
+    uuid: 'inPluginUUID',
+    actionid:'actionid',
+    key:'0-1',
+    param:paramData
+  }
+
+  let evt = {
+    data:JSON.stringify(json)
+  }
+
+  ht.dispatchEvent(evt)
+}
+
+test()
+const httpToolAction = new HttpToolAction()
+//httpToolAction.connectUlanziDeckSocket(3906, pluginUUID)
 
 
 

@@ -13,8 +13,9 @@
   "Actions": [
     {
       "Name": "Httptool",
-      "UUID": "com.ulanzi.httptool.tool",
+      "UUID": "com.ulanzi.httptool.action",
       "Icon": "resources/images/actionIcon",
+      "PropertyInspectorPath": "httptool_pi.html",
       "State": "0",
       "States": [
         {

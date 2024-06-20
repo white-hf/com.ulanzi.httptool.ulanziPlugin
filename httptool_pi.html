@@ -11,16 +11,6 @@
 <body>
     <div class="sdpi-wrapper">
         <div id="advanced_settings_container">
-            <div class="sdpi-item">
-                <div style="width: 15px;"></div>
-                <div class="sdpi-item-value">
-                    <div class="sdpi-item-child">
-                        <input id="enable_success_indicator" type="checkbox class="sdProperty">
-                        <label for="enable_success_indicator" class="sdpi-item-label"><span></span>Enable green success indicator</label>
-                    </div>
-                </div>
-            </div>
-
             <div id="request_parameters_container" ">
                 <div class="sdpi-item">
                     <div class="sdpi-item-label">HTTP Method</div>
@@ -51,14 +41,14 @@
                 </div>
                 <div type="textarea" class="sdpi-item alignTop">
                     <div class="sdpi-item-label">Request Headers</div>
-                    <span class="sdpi-item-value sdProperty textarea">
-                        <textarea type="textarea" class="autosize"  id="request_headers" placeholder="KEY: VALUE"></textarea>
+                    <span class="sdpi-item-value textarea">
+                        <textarea type="textarea" class="autosize sdProperty"  id="request_headers" placeholder="KEY: VALUE"></textarea>
                     </span>
                 </div>
                 <div type="textarea" class="sdpi-item alignTop">
                     <div class="sdpi-item-label">Request Body</div>
-                    <span class="sdpi-item-value sdProperty textarea">
-                        <textarea type="textarea" class="autosize"  id="request_body"></textarea>
+                    <span class="sdpi-item-value  textarea">
+                        <textarea type="textarea" class="autosize sdProperty"  id="request_body"></textarea>
                     </span>
                 </div>
             </div>
@@ -81,7 +71,7 @@
                
                 <div class="sdpi-item">
                     <div style="width: 15px;"></div>
-                    <div class="sdpi-item-value sdProperty">
+                    <div class="sdpi-item-value">
                         <div class="sdpi-item-child">
                             <input id="poll_status"  type="checkbox" class="sdProperty">
                             <label for="poll_status" class="sdpi-item-label"><span></span>Periodically poll the URL for status</label>

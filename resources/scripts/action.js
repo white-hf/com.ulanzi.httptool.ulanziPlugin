@@ -1,5 +1,6 @@
 ﻿//action.js 当上位软件选中一个action时加载其界面，取消选中时销毁，一个action可能会创建多个实例，通过key区分不同实例
-const pluginUUID = 'com.ulanzi.counter'
+const pluginUUID = 'com.ulanzi.httptool.action'
+const port       = 3906
 
 class HttpToolUIAction extends ActionBase
 {
@@ -25,12 +26,13 @@ class HttpToolUIAction extends ActionBase
    */
   onLoadConfiguration(param)
   {
+    console.log('onLoadConfiguration in ui')
     this.loadSettings(param)
   }
 }
 
 const httpToolUIAction = new HttpToolUIAction()
-httpToolUIAction.connectUlanziDeckSocket(3906 , pluginUUID)
+httpToolUIAction.connectUlanziDeckSocket(port , pluginUUID)
 
 function save()
 {

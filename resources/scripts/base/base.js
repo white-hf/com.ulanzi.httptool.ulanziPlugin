@@ -1,3 +1,14 @@
+
+/**
+ * 代表一个连接会话，对应插件 ui不需要，仅仅一个。但对插件后台可能需要，一个插件
+ * 如果安装在多个硬件按钮，并同一时段内都使用。
+ */
+class ConnectSession {
+  actionId;
+  remoteKey;
+  isResponse;
+}
+
 /*
 * 插件事件处理等逻辑基础类，包含公共方法
 */
@@ -9,6 +20,7 @@ class ActionBase {
   websocket;
   isResponse;
   remoteKey;
+  isKeepAlive = true;
 
   data = {};
   actionChilds = new Map();
@@ -33,9 +45,9 @@ class ActionBase {
 
     try {
       this.websocket = new WebSocket('ws://127.0.0.1:' + port);
-      this.websocket.onopen = () => registerPlugin(uuid);
+      this.websocket.onopen = () => this.registerPlugin(uuid);
 
-      this.websocket.onmessage = () => dispatchEvent(evt);
+      this.websocket.onmessage = (evt) => this.dispatchEvent(evt);
 
       this.websocket.onerror = (evt) => {
          console.log('WEBSOCKET ERROR:' , evt);
@@ -43,6 +55,8 @@ class ActionBase {
 
     this.websocket.onclose = (evt) => {
         console.log('WEBSOCKET CLOSED:', evt);
+        if (this.isKeepAlive)
+          this.connectUlanziDeckSocket(this.port , this.uuid)
     };
 
     } catch (error) {
@@ -55,46 +69,71 @@ class ActionBase {
    * 插件事件处理，需注意UI和后台的差异
    */
   dispatchEvent(evt) {
-    let jsonObj = JSON.parse(evt.data)
-    console.log('onmessage json: ', jsonObj)
+    console.log('dispatchEvent, json: ', evt.data)
 
+    let jsonObj = null;
+    try {
+      jsonObj = JSON.parse(evt.data)      
+    } catch (error) {
+        console.log('Json parse failed,', evt.data)
+        return
+    }
+    
     let event = jsonObj['cmd']
 
     //接收到的uuid，可以是主服务的uuid,也可以是action的uuid
-    uuid = jsonObj['uuid']
-    remoteKey = jsonObj['key']
+    //插件知道自己的uuid，不需要保存参数中，如果和参数中的值不等，应该抛弃此命令。
+    let uuid = jsonObj['uuid']
+    this.remoteKey = jsonObj['key'] !== undefined?jsonObj['key']:this.remoteKey
     let param = jsonObj['param']
 
     let code = jsonObj['code']
-    isResponse = code !== undefined
+    this.isResponse = code !== undefined
 
-    let uniqueActionId = actionUUID = jsonObj['actionid']
+    //插件不知道自己的actionid，需要保存，主要插件后台有多个实例时需要。
+    let uniqueActionId = this.actionUUID = jsonObj['actionid']
+
+    if (this.actionUUID)
+    { 
+      //记录连接session     
+      if (!this.actionChilds.has(uniqueActionId)) {
+        let newSession = new ConnectSession()
+        newSession.actionId = uniqueActionId
+        newSession.uuid = this.uuid
+        newSession.isResponse = this.isResponse;
+        newSession.remoteKey = this.remoteKey;
+
+        this.actionChilds.set(uniqueActionId, newSession)
+      }
+    }
+  
 
     if (event === 'run') {
-      onRun(uniqueActionId, uuid, remoteKey, param)
+      this.onRun(uniqueActionId, this.uuid, this.remoteKey, param)
     } else if (event === 'add') {
-      if (!actionChilds.has(remoteKey)) {
-        actionChilds.set(remoteKey, uuid)
-        onAdd(uniqueActionId, uuid, remoteKey, param)
-      }
+      this.onAdd(uniqueActionId, this.uuid, this.remoteKey, param)
     } else if (event === 'clear') {
-      if (actionChilds.has(remoteKey)) {
-        actionChilds.delete(remoteKey)
-
         uuid = param.uuid
         uniqueActionId = param.actionid
         key = param.key
-        onClear(uniqueActionId, uuid, remoteKey, param)
-      }
+        this.onClear(uniqueActionId, this.uuid, this.remoteKey, param)
+
+        if (this.actionChilds.has(uniqueActionId)) {
+          this.actionChilds.delete(uniqueActionId)
+        }
+
+      //关闭连接
+      this.isKeepAlive = false;
+      this.websocket.close()
     }
     else if (event === 'state') {
 
     } else if (event === 'paramfromplugin') {
       console.log('paramfromplugin received payload: ', param)
-      onReceiveSettings(uniqueActionId, param)
+      this.onReceiveSettings(uniqueActionId, param)
     } else if (event === 'paramfromapp') {
       console.log('paramfromapp received payload: ', param)
-      onLoadConfiguration(param)
+      this.onLoadConfiguration(param)
     } else {
       const message = event;
       if (message && message !== '') this.emit(message, data);
@@ -108,7 +147,7 @@ class ActionBase {
       cmd: 'connected',
       uuid: inPluginUUID
     }
-    console.log('registerPlugin ' + json)
+    console.log('registerPlugin ' , json)
     this.websocket.send(JSON.stringify(json))
   }
 
@@ -117,10 +156,19 @@ class ActionBase {
    * @param {*} text 
    * @returns 
    */
-  showText(text)
+  showText(text, actionId)
   {
+    console.log('showText:%s,%d' , text , actionId)
+    
     if (!this.checkWebSocket())
       return
+
+    mySession = this.actionChilds.get(actionId)
+    if (!mySession)
+    {
+      console.log('Can not find session by ',actionId)
+      return
+    }
 
     var json = {
       'cmd': 'state',
@@ -128,8 +176,8 @@ class ActionBase {
         'statelist': [
           {
             'uuid': this.uuid,
-            'actionId': this.actionUUID,
-            'key': this.remoteKey,
+            'actionid': actionId,
+            'key': mySession.remoteKey,
             'showtext":': true,
             'textdata': text
           }
@@ -148,21 +196,21 @@ class ActionBase {
    * 插件启动运行，不同插件需要实现不同逻辑
    */
   onRun(uniqueActionId, uuid, key, param) {
-    var payload = data[actionId];
+    console.log('onRun in base')
   }
 
   /**
    * 添加插件，不同插件需要实现不同逻辑
    */
   onAdd(uniqueActionId, uuid, remoteKey, param) {
-
+    console.log('onAdd in base')
   }
 
   /**
    * 插件UI的配置数据传递给上位机app保存，插件后台也需要保存，同一插件后台可以多个运行实例，可以多份数据
    */
   onReceiveSettings(uniqueActionId, payload) {
-    data[uniqueActionId] = payload
+    console.log('onReceiveSettings in base')
   }
 
   /**
@@ -176,7 +224,7 @@ class ActionBase {
    * 删除插件配置信息
    */
   onClear(uniqueActionId, uuid, remoteKey, param) {
-
+    console.log('onClear in base')
   }
 
 
@@ -194,7 +242,7 @@ class ActionBase {
         'statelist': [
           {
             'uuid': this.uuid,
-            'actionId': this.actionUUID,
+            'actionid': this.actionUUID,
             'key': this.remoteKey,
             'type': 1,
             'data': vKrabsBase64
@@ -206,9 +254,16 @@ class ActionBase {
     this.websocket.send(JSON.stringify(json))
   }
 
-  setImage(state) {
+  setImage(state , actionId) {
     if (!this.checkWebSocket())
       return
+
+    mySession = this.actionChilds.get(actionId)
+    if (!mySession)
+    {
+      console.log('Can not find session by ',actionId)
+      return
+    }
 
     var json = {
       'cmd': 'state',
@@ -216,8 +271,8 @@ class ActionBase {
         'statelist': [
           {
             'uuid': this.uuid,
-            'actionId': this.actionUUID,
-            'key': this.remoteKey,
+            'actionid': actionId,
+            'key': mySession.remoteKey,
             'type': 0,
             'state': state
           }
@@ -238,7 +293,7 @@ class ActionBase {
         'stateList': [
           {
             'uuid': this.uuid,
-            'actionId': this.actionUUID,
+            'actionid': this.actionUUID,
             'key': this.remoteKey,
             'type': 2,
             'path': path
@@ -293,6 +348,7 @@ class ActionBase {
       console.log('Save: [' + key + ']:[' + payload[key] + ']')
     })
 
+    console.log(payload)
     this.setSettingsToPlugin(payload)
   }
 
@@ -301,9 +357,12 @@ class ActionBase {
    * @param {*} payload 
    */
   loadSettings(payload) {
-    console.log(payload)
+    console.log('loadSettings:',payload)
     for (var key in payload) {
       try {
+        if (key == null)
+          continue
+
         var elem = document.getElementById(key)
         if (elem.classList.contains('sdCheckbox') || elem.type === 'checkbox') { // Checkbox
           elem.checked = payload[key]
@@ -353,10 +412,12 @@ class ActionBase {
   }
 
   setSettingsToPlugin(payload) {
+    //插件ui保持配置，不需要区分connect session
     if (this.checkWebSocket()) {
       const json = {
         'cmd': 'paramfromplugin',
         'uuid': this.uuid,
+        'actionid':this.actionUUID,
         'key': this.remoteKey,
         'param': payload
       }
@@ -369,3 +430,5 @@ class ActionBase {
     return (this.websocket && (this.websocket.readyState === 1))
   }
 }
+
+module.exports = ActionBase 
