@@ -3,6 +3,9 @@
 const ActionBase = require('./base/base.js')
 
 const pluginUUID = 'com.ulanzi.httptool'
+const result_parse_match_img = 1
+const result_parse_not_match_img = 2
+
 class HttpToolAction extends ActionBase {
 
   constructor() {
@@ -13,6 +16,8 @@ class HttpToolAction extends ActionBase {
   * 添加插件，不同插件需要实现不同逻辑
   */
   onAdd(uniqueActionId, uuid, remoteKey, param) {
+    console.log('onAdd,actionid:%s,uuid:%s' , uniqueActionId,uuid)
+    
     //插件第一次添加时没有配置数据，不需要运行。
     let request_url = this.data[uniqueActionId]
     if (param.request_url)
@@ -33,6 +38,8 @@ class HttpToolAction extends ActionBase {
   * 删除插件配置信息
   */
   onClear(uniqueActionId, uuid, remoteKey, param) {
+    console.log('onClear,actionid:%s, uuid:%s' , uniqueActionId , uuid)
+    
     let request_url = this.data[uniqueActionId]
     if (request_url)
     {
@@ -50,7 +57,7 @@ class HttpToolAction extends ActionBase {
    */
   onRun(uniqueActionId, uuid, key, param) {
     
-    console.log('onRun')
+    console.log('onRun, actionid:%s,uuid:%s', uniqueActionId , uuid)
 
     let request_url = this.data[uniqueActionId]
     if (!request_url)
@@ -232,8 +239,8 @@ async function checkResponseValue(resp, do_status_poll) {
 
   //需要2个资源文件，根据请求结果是否匹配显示
   imageIndex = key_state
-              ? 1 
-              : 2;
+              ? result_parse_match_img 
+              : result_parse_not_match_img;
   
   //httpToolAction.setImageByPath
   httpToolAction.setImage(imageIndex , actionId)
@@ -286,22 +293,26 @@ return {
 function test()
 {
   const ht = new HttpToolAction()
+  ht.uuid = 'i am uuid'
 
   let paramData = {
     request_url:'http://127.0.0.1:3306/api',
-    response_parse:false,
+    response_parse:true,
     poll_status:false,
     request_method:'GET',
     request_body:'',
     request_headers:'origin:http://127.0.0.1:3306\nt1:v1',
-    request_content_type:'application/xml'
+    request_content_type:'application/xml',
+    response_parse_field: "cmd",
+    response_parse_value: "add",
+   
   }
 
   let json = {
     code: '0',
     cmd: 'add',
-    uuid: 'inPluginUUID',
-    actionid:'actionid',
+    uuid: 'i am uuid',
+    actionid:'i am actionid',
     key:'0-1',
     param:paramData
   }
@@ -310,6 +321,20 @@ function test()
     data:JSON.stringify(json)
   }
 
+  ht.dispatchEvent(evt)
+
+  //run
+  json.cmd = 'run'
+  evt.data = JSON.stringify(json)
+  ht.dispatchEvent(evt)
+
+  //clear
+  json.cmd = 'clear'
+  paramData.uuid = 'i am uuid'
+  paramData.key = '0_1'
+  paramData.actionid = 'i am actionid'
+
+  evt.data = JSON.stringify(json)
   ht.dispatchEvent(evt)
 }
 

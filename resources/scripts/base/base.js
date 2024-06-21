@@ -4,22 +4,23 @@
  * 如果安装在多个硬件按钮，并同一时段内都使用。
  */
 class ConnectSession {
-  actionId;
+  actionid;
   remoteKey;
   isResponse;
 }
 
 /*
-* 插件事件处理等逻辑基础类，包含公共方法
+* 插件事件处理等逻辑基础类，包含公共方法，混杂了插件ui和插件后台的方法。
+* 具体的业务插件可以继承实现ui和后台的子类，实现onAdd,onRun,onClear等处理不同业务逻辑的方法。
 */
 class ActionBase {
   port;
   uuid;
   messageType;
-  actionUUID;
+  actionid;
+  remoteKey;
   websocket;
   isResponse;
-  remoteKey;
   isKeepAlive = true;
 
   data = {};
@@ -83,17 +84,18 @@ class ActionBase {
 
     //接收到的uuid，可以是主服务的uuid,也可以是action的uuid
     //插件知道自己的uuid，不需要保存参数中，如果和参数中的值不等，应该抛弃此命令。
-    let uuid = jsonObj['uuid']
-    this.remoteKey = jsonObj['key'] !== undefined?jsonObj['key']:this.remoteKey
+    //注意，不是每个命令jsonObj都存在uuid，key等参数，有些在param等二级参数里。
+    let uuidFromCmd = jsonObj['uuid']
+    this.remoteKey  = jsonObj['key'] !== undefined ? jsonObj['key'] : this.remoteKey
     let param = jsonObj['param']
 
     let code = jsonObj['code']
     this.isResponse = code !== undefined
 
     //插件不知道自己的actionid，需要保存，主要插件后台有多个实例时需要。
-    let uniqueActionId = this.actionUUID = jsonObj['actionid']
+    let uniqueActionId = this.actionid = jsonObj['actionid']
 
-    if (this.actionUUID)
+    if (this.actionid)
     { 
       //记录连接session     
       if (!this.actionChilds.has(uniqueActionId)) {
@@ -113,10 +115,9 @@ class ActionBase {
     } else if (event === 'add') {
       this.onAdd(uniqueActionId, this.uuid, this.remoteKey, param)
     } else if (event === 'clear') {
-        uuid = param.uuid
+        uuidFromCmd = param.uuid
         uniqueActionId = param.actionid
-        key = param.key
-        this.onClear(uniqueActionId, this.uuid, this.remoteKey, param)
+        this.onClear(uniqueActionId, this.uuid, param.key , param)
 
         if (this.actionChilds.has(uniqueActionId)) {
           this.actionChilds.delete(uniqueActionId)
@@ -124,7 +125,9 @@ class ActionBase {
 
       //关闭连接
       this.isKeepAlive = false;
-      this.websocket.close()
+      
+      if (this.checkWebSocket())
+        this.websocket.close()
     }
     else if (event === 'state') {
 
@@ -158,8 +161,8 @@ class ActionBase {
    */
   showText(text, actionId)
   {
-    console.log('showText:%s,%d' , text , actionId)
-    
+    console.log('showText:%s,%s' , text , actionId)
+
     if (!this.checkWebSocket())
       return
 
@@ -232,9 +235,16 @@ class ActionBase {
   /**
   * 设置自定义图片，内容是base64格式
   */
-  setUserDefinedImage(vKrabsBase64) {
+  setUserDefinedImage(vKrabsBase64, actionid) {
     if (!this.checkWebSocket())
       return
+
+    mySession = this.actionChilds.get(actionId)
+    if (!mySession)
+    {
+      console.log('Can not find session by %s',actionId)
+      return
+    }
 
     var json = {
       'cmd': 'state',
@@ -242,8 +252,8 @@ class ActionBase {
         'statelist': [
           {
             'uuid': this.uuid,
-            'actionid': this.actionUUID,
-            'key': this.remoteKey,
+            'actionid': mySession.actionId,
+            'key': mySession.remoteKey,
             'type': 1,
             'data': vKrabsBase64
           }
@@ -255,13 +265,15 @@ class ActionBase {
   }
 
   setImage(state , actionId) {
+    console.log('setImage,state:%d,actionid:%s' , state , actionId)
+    
     if (!this.checkWebSocket())
       return
 
     mySession = this.actionChilds.get(actionId)
     if (!mySession)
     {
-      console.log('Can not find session by ',actionId)
+      console.log('Can not find session by %s',actionId)
       return
     }
 
@@ -283,9 +295,16 @@ class ActionBase {
     this.websocket.send(JSON.stringify(json))
   }
 
-  setImageByPath(path) {
+  setImageByPath(path, actionid) {
     if (!this.checkWebSocket())
       return
+
+    mySession = this.actionChilds.get(actionId)
+    if (!mySession)
+    {
+      console.log('Can not find session by %s',actionId)
+      return
+    }
 
     var json = {
       'cmd': 'state',
@@ -293,8 +312,8 @@ class ActionBase {
         'stateList': [
           {
             'uuid': this.uuid,
-            'actionid': this.actionUUID,
-            'key': this.remoteKey,
+            'actionid': actionid,
+            'key': mySession.remoteKey,
             'type': 2,
             'path': path
           }
@@ -401,7 +420,7 @@ class ActionBase {
         } catch (error) { }
 
       } catch (err) {
-        console.log('loadConfiguration failed for key: ' + key + ' - ' + err)
+        console.warn('loadConfiguration failed for key: ' + key + ' - ' + err)
       }
     }
 
@@ -417,7 +436,7 @@ class ActionBase {
       const json = {
         'cmd': 'paramfromplugin',
         'uuid': this.uuid,
-        'actionid':this.actionUUID,
+        'actionid':this.actionid,
         'key': this.remoteKey,
         'param': payload
       }
