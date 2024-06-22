@@ -276,6 +276,16 @@ option {
   max-width: 344px;
 }
 
+.sdpi-button {
+  display: flex;
+  flex-direction: row;
+  min-height: 32px;
+  align-items: flex-end;
+  margin-top: 2px;
+  max-width: 44px;
+  margin-left: 290px;
+}
+
 .sdpi-item:first-child {
   margin-top:1px;
 }

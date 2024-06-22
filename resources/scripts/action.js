@@ -37,4 +37,19 @@ httpToolUIAction.connectUlanziDeckSocket(port , pluginUUID)
 function save()
 {
   httpToolUIAction.saveSettings()
+  Toast('Your changes Saved.', 1000)
+}
+
+function Toast(msg,duration){
+  duration=isNaN(duration)?3000:duration;
+  var m = document.createElement('div');
+  m.innerHTML = msg;
+  m.className = 'sdpi-item'
+  document.body.appendChild(m);
+  setTimeout(function() {
+    var d = 0.5;
+    //m.style.webkitTransition = '-webkit-transform ' + d + 's ease-in, opacity ' + d + 's ease-in';
+    m.style.opacity = '0';
+    setTimeout(function() { document.body.removeChild(m) }, d * 1000);
+  }, duration);
 }

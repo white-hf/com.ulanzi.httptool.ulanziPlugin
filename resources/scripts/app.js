@@ -338,9 +338,9 @@ function test()
   ht.dispatchEvent(evt)
 }
 
-test()
+//test()
 const httpToolAction = new HttpToolAction()
-//httpToolAction.connectUlanziDeckSocket(3906, pluginUUID)
+httpToolAction.connectUlanziDeckSocket(3906, pluginUUID)
 
 
 
